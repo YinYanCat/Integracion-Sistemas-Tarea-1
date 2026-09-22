@@ -1,0 +1,45 @@
+syntax = "proto3";
+package stock;
+
+service Stock {
+    rcp Consultar (ConsultarRequest) returns (ConsultarResponse);
+    rcp Listar (ListarRequest) returns (ListarResponse);
+    rcp Descontar (DescontarRequest) return (DescontarResponse);
+    rcp Reponer (ReponerRequest) return (ReponerResponse);
+}
+
+message Medicamento {
+
+}
+
+message ConsultarRequest {
+
+}
+
+message ListarRequest {
+
+}
+
+message DescontarRequest {
+
+}
+
+message ReponerRequest {
+
+}
+
+message ConsultarResponse {
+
+}
+
+message ListarResponse {
+
+}
+
+message DescontarResponse {
+
+}
+
+message ReponerResponse {
+    
+}
