@@ -5,7 +5,7 @@ from concurrent import futures
 import grpc
 
 import stock_pb2_grpc
-import db
+import bd_stock as db
 from stock_service import StockServicer
 
 logging.basicConfig(
@@ -23,7 +23,7 @@ def serve():
     logger.info("Base de datos de Stock inicializada en %s", db.DB_PATH)
 
     server = grpc.server(futures.ThreadPoolExecutor(max_workers=MAX_WORKERS))
-    stock_pb2_grpc.add_StockServiceServicer_to_server(StockServicer(), server)
+    stock_pb2_grpc.add_StockServicer_to_server(StockServicer(), server)
 
     listen_addr = f"[::]:{PORT}"
     server.add_insecure_port(listen_addr)

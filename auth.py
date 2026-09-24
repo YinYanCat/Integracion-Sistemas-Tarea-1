@@ -11,7 +11,7 @@ API_KEYS_VALIDAS = set(
 
 def problema(status: int, title: str, detail: str, instance: str):
     return {
-        "type": "https://saludtotal.cl/errors/{title.lower().replace(' ', '-')}",
+        "type": f"https://saludtotal.cl/errors/{title.lower().replace(' ', '-')}",
         "title": title,
         "status": status,
         "detail": detail,
