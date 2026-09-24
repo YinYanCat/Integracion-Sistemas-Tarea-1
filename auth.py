@@ -11,7 +11,7 @@ API_KEYS_VALIDAS = set(
 
 def problema(status: int, title: str, detail: str, instance: str):
     return {
-        "type": f"https://saludtotal.cl/errors/{title.lower().replace(' ', '-')}",
+        "type": "https://saludtotal.cl/errors/{title.lower().replace(' ', '-')}",
         "title": title,
         "status": status,
         "detail": detail,
@@ -27,7 +27,7 @@ async def verificar_api_key(request: Request, x_api_key: str = Header(default=No
             detail=problema(
                 status=401,
                 title="No autenticado",
-                detail="Falta el header X-API-Key o su valor es inválido",
+                detail="Falta el header X-API-Key o su valor es invalido",
                 instance=str(request.url.path),
             ),
         )
