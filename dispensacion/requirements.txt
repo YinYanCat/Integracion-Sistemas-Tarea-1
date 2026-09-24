@@ -1,0 +1,5 @@
+flask
+pydantic
+grpcio
+protobuf
+gunicorn

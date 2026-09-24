@@ -1,0 +1,52 @@
+services:
+
+  stock:
+    build:
+      context: .
+      dockerfile: stock/Dockerfile
+    
+    container_name: saludtotal-stock
+    
+    environment:
+      STOCK_DB_PATH: /data/stock.db
+      STOCK_GRPC_PORT: "50051"
+    
+    volumes:
+      - stock_data:/data
+    
+    expose:
+      - "50051"
+    
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.settimeout(2); s.connect(('localhost', 50051))"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  dispensacion:
+    
+    build:
+      context: .
+      dockerfile: dispensacion/Dockerfile
+    
+    container_name: saludtotal-dispensacion
+    
+    environment:
+      DISPENSACION_DB_PATH: /data/dispensacion.db
+      DISPENSACION_API_KEYS: clave-dev-123
+      STOCK_GRPC_TARGET: stock:50051
+      STOCK_GRPC_TIMEOUT: "2.0"
+    
+    volumes:
+      - dispensacion_data:/data
+    
+    ports:
+      - "8000:8000"
+    
+    depends_on:
+      stock:
+        condition: service_healthy
+
+volumes:
+  stock_data:
+  dispensacion_data:

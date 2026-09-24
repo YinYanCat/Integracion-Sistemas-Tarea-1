@@ -1,0 +1,294 @@
+openapi: 3.0.3
+info:
+  title: Dispensación API — SaludTotal
+  description: >
+    API pública del sistema de Dispensación. Gestiona pacientes y
+    dispensaciones de recetas, verificando disponibilidad de stock contra
+    el servicio interno de Stock (gRPC) antes de confirmar una dispensación.
+  version: "1.0.0"
+servers:
+  - url: /v1
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /pacientes:
+    post:
+      summary: Registrar un nuevo paciente
+      operationId: crearPaciente
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NuevoPaciente"
+      responses:
+        "201":
+          description: Paciente creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Paciente"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+    get:
+      summary: Listar pacientes
+      operationId: listarPacientes
+      responses:
+        "200":
+          description: Lista de pacientes
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Paciente"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /pacientes/{id}:
+    get:
+      summary: Consultar un paciente por id
+      operationId: obtenerPaciente
+      parameters:
+        - $ref: "#/components/parameters/IdPaciente"
+      responses:
+        "200":
+          description: Paciente encontrado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Paciente"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /dispensaciones:
+    post:
+      summary: >
+        Registrar una dispensación. Verifica disponibilidad contra el
+        servicio de Stock (gRPC) antes de confirmar.
+      operationId: crearDispensacion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NuevaDispensacion"
+      responses:
+        "201":
+          description: Dispensación registrada y stock descontado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dispensacion"
+        "400":
+          $ref: "#/components/responses/SolicitudInvalida"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          description: El paciente indicado no existe
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEstandar"
+        "409":
+          description: >
+            No se pudo dispensar (stock insuficiente o medicamento
+            inexistente en Stock). La solicitud era válida; el conflicto
+            está en el estado actual del recurso Stock.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEstandar"
+        "503":
+          $ref: "#/components/responses/StockNoDisponible"
+    get:
+      summary: Listar dispensaciones
+      operationId: listarDispensaciones
+      responses:
+        "200":
+          description: Lista de dispensaciones
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Dispensacion"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+
+  /dispensaciones/{id}:
+    get:
+      summary: Consultar una dispensación por id
+      operationId: obtenerDispensacion
+      parameters:
+        - $ref: "#/components/parameters/IdDispensacion"
+      responses:
+        "200":
+          description: Dispensación encontrada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dispensacion"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+
+  /dispensaciones/{id}/revertir:
+    post:
+      summary: >
+        Revertir una dispensación activa. Repone las unidades en Stock
+        (gRPC) y marca la dispensación como 'revertida'.
+      operationId: revertirDispensacion
+      parameters:
+        - $ref: "#/components/parameters/IdDispensacion"
+      responses:
+        "200":
+          description: Dispensación revertida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Dispensacion"
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "409":
+          description: La dispensación ya estaba revertida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEstandar"
+        "503":
+          $ref: "#/components/responses/StockNoDisponible"
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+
+  parameters:
+    IdPaciente:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    IdDispensacion:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    NoAutenticado:
+      description: Falta el header X-API-Key o su valor es inválido
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEstandar"
+    NoEncontrado:
+      description: El recurso solicitado no existe
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEstandar"
+    SolicitudInvalida:
+      description: El cuerpo de la solicitud no cumple el esquema esperado
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEstandar"
+    StockNoDisponible:
+      description: >
+        El servicio de Stock (gRPC) no respondió a tiempo o está caído.
+        Ver ADR-004 (Resiliencia y modos de falla).
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorEstandar"
+
+  schemas:
+    NuevoPaciente:
+      type: object
+      required: [nombre, rut]
+      properties:
+        nombre:
+          type: string
+        rut:
+          type: string
+
+    Paciente:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nombre:
+          type: string
+        rut:
+          type: string
+        fecha_registro:
+          type: string
+          format: date-time
+
+    NuevaDispensacion:
+      type: object
+      required: [paciente_id, codigo_medicamento, cantidad]
+      properties:
+        paciente_id:
+          type: string
+          format: uuid
+        codigo_medicamento:
+          type: string
+        cantidad:
+          type: integer
+          minimum: 1
+
+    Dispensacion:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        paciente_id:
+          type: string
+          format: uuid
+        codigo_medicamento:
+          type: string
+        nombre_medicamento:
+          type: string
+        cantidad:
+          type: integer
+        estado:
+          type: string
+          enum: [activa, revertida]
+        fecha:
+          type: string
+          format: date-time
+
+    ErrorEstandar:
+      type: object
+      description: Formato de error estilo RFC 7807 (Problem Details).
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
