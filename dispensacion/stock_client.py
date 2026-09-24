@@ -66,7 +66,7 @@ class StockClient:
             "Fallo gRPC en %s(codigo=%s): %s - %s",
             operacion, codigo_medicamento, code, exc.details(),
         )
-        # DEADLINE_EXCEEDED y UNAVAILABLE (servicio caido o sin
+        # DEADLINE_EXCEEDED y UNAVAILABLE (servicio caido o sin conexión)
         # Decisión que tomamos para T7
         if code in (grpc.StatusCode.UNAVAILABLE, grpc.StatusCode.DEADLINE_EXCEEDED):
             raise StockNoDisponibleError(
