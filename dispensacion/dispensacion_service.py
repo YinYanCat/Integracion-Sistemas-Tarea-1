@@ -1,4 +1,5 @@
 import logging
+import sqlite3
 import uuid
 
 from flask import Flask, request, jsonify
@@ -44,7 +45,12 @@ def crear_paciente():
         return jsonify(problema(400, "Solicitud invalida", str(exc), request.path)), 400
 
     with db.get_connection() as conn:
-        paciente = db.crear_paciente(conn, cuerpo.nombre, cuerpo.rut)
+        try:
+            paciente = db.crear_paciente(conn, cuerpo.nombre, cuerpo.rut)
+        except sqlite3.IntegrityError:
+            detalle = f"Ya existe un paciente registrado con el rut '{cuerpo.rut}'"
+            cuerpo_error = problema(409, "Rut ya registrado", detalle, request.path)
+            return jsonify(cuerpo_error), 409
     return jsonify(_paciente_a_dict(paciente)), 201
 
 

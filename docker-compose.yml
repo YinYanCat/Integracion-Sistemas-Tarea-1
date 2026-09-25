@@ -1,5 +1,19 @@
 services:
 
+  redis:
+    image: redis:8-alpine
+    
+    container_name: saludtotal-redis
+
+    expose:
+      - "6379"
+
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   stock:
     build:
       context: .
@@ -36,6 +50,8 @@ services:
       DISPENSACION_API_KEYS: clave-dev-123
       STOCK_GRPC_TARGET: stock:50051
       STOCK_GRPC_TIMEOUT: "2.0"
+      REDIS_URL: redis://redis:6379/0
+      STOCK_CACHE_TTL: "30"
     
     volumes:
       - dispensacion_data:/data
