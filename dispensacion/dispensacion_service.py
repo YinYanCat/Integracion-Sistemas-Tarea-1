@@ -2,6 +2,7 @@ import logging
 import sqlite3
 import uuid
 
+import grpc
 from flask import Flask, request, jsonify
 from pydantic import ValidationError
 
@@ -71,6 +72,29 @@ def listar_pacientes():
     with db.get_connection() as conn:
         pacientes = db.listar_pacientes(conn)
     return jsonify([_paciente_a_dict(p) for p in pacientes]), 200
+
+
+@app.get("/v1/medicamentos/<codigo>")
+@requiere_api_key
+def consultar_disponibilidad(codigo):
+    cliente_stock = obtener_cliente()
+    try:
+        info = cliente_stock.consultar(codigo)
+    except StockNoDisponibleError as exc:
+        cuerpo_error = problema(503, "Servicio de Stock no disponible", str(exc), request.path)
+        return jsonify(cuerpo_error), 503
+    except grpc.RpcError as exc:
+        if exc.code() == grpc.StatusCode.NOT_FOUND:
+            detalle = f"No existe el medicamento '{codigo}'"
+            return jsonify(problema(404, "Medicamento no encontrado", detalle, request.path)), 404
+        raise
+
+    return jsonify({
+        "codigo_medicamento": info.codigo_medicamento,
+        "nombre": info.nombre,
+        "unidades_disponibles": info.unidades_disponibles,
+        "disponible": info.disponible,
+    }), 200
 
 
 @app.post("/v1/dispensaciones")

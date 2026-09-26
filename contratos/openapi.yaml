@@ -67,6 +67,40 @@ paths:
         "404":
           $ref: "#/components/responses/NoEncontrado"
 
+  /medicamentos/{codigo}:
+    get:
+      summary: >
+        Consultar disponibilidad de un medicamento.
+      operationId: consultarDisponibilidad
+      parameters:
+        - name: codigo
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Disponibilidad del medicamento
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  codigo_medicamento:
+                    type: string
+                  nombre:
+                    type: string
+                  unidades_disponibles:
+                    type: integer
+                  disponible:
+                    type: boolean
+        "401":
+          $ref: "#/components/responses/NoAutenticado"
+        "404":
+          $ref: "#/components/responses/NoEncontrado"
+        "503":
+          $ref: "#/components/responses/StockNoDisponible"
+
   /dispensaciones:
     post:
       summary: >
