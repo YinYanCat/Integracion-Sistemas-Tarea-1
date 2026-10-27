@@ -1,12 +1,14 @@
 """
 Uso:
-    python medir_cache_disponibilidad.py --iteraciones 100
+    python medir_cache_disponibilidad.py --iteraciones 100 --output-csv resultados_cache.csv
 """
 
 import argparse
+import csv
 import statistics
 import sys
 import time
+from datetime import datetime
 
 import requests
 
@@ -52,57 +54,113 @@ def resumen(nombre, tiempos_ms):
     return fila
 
 
+def guardar_registros_csv(filepath, registros):
+    """Guarda cada request realizada en un archivo CSV."""
+    encabezados = [
+        "timestamp",
+        "iteracion",
+        "es_warmup",
+        "tipo_cache",
+        "medicamento",
+        "status_code",
+        "tiempo_ms",
+    ]
+    with open(filepath, mode="w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=encabezados)
+        writer.writeheader()
+        writer.writerows(registros)
+    print(f"\n[+] Datos de requests guardados en: {filepath}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Compara latencia con cache HIT vs MISS")
     parser.add_argument("--base-url", default=BASE_URL_DEFAULT)
     parser.add_argument("--api-key", default=API_KEY_DEFAULT)
     parser.add_argument("--redis-url", default=REDIS_URL_DEFAULT)
     parser.add_argument("--medicamento", default="MED-1",
-                        help="cualquier código válido sirve, incluso MED-3 (0 stock), "
+                        help="Cualquier código válido sirve, incluso MED-3 (0 stock), "
                              "porque este endpoint no depende de tener unidades")
     parser.add_argument("--iteraciones", type=int, default=500)
     parser.add_argument("--warmup", type=int, default=5)
+    parser.add_argument("--output-csv", default="resultados_cache.csv",
+                        help="Ruta del archivo CSV para exportar las métricas de cada request")
     args = parser.parse_args()
 
     session = requests.Session()
     session.headers.update({"X-API-Key": args.api_key})
 
+    if redis is None:
+        print("Error: la librería 'redis' no está instalada.")
+        sys.exit(1)
+
     try:
         cache = redis.Redis.from_url(args.redis_url, socket_connect_timeout=2)
         cache.ping()
     except redis.RedisError as exc:
-        print(exc)
+        print(f"Error conectando a Redis: {exc}")
         sys.exit(1)
 
     clave_cache = f"stock:{args.medicamento}"
     url = f"{args.base_url}/medicamentos/{args.medicamento}"
 
     tiempos_miss, tiempos_hit = [], []
+    registros_csv = []
     total = args.warmup + args.iteraciones
 
     for i in range(total):
         medido = i >= args.warmup
+        es_warmup = not medido
 
         # --- Forzar MISS ---
         cache.delete(clave_cache)
+        ts_miss = datetime.now().isoformat()
         t0 = time.perf_counter()
         r1 = session.get(url)
         t1 = time.perf_counter()
+        duracion_miss_ms = (t1 - t0) * 1000
+
+        registros_csv.append({
+            "timestamp": ts_miss,
+            "iteracion": i,
+            "es_warmup": es_warmup,
+            "tipo_cache": "MISS",
+            "medicamento": args.medicamento,
+            "status_code": r1.status_code,
+            "tiempo_ms": round(duracion_miss_ms, 3),
+        })
+
         if r1.status_code != 200:
             print(f"  iter {i} (MISS): {r1.status_code} {r1.text[:120]}")
             continue
 
         # --- Debería ser HIT (la request anterior ya la cacheó) ---
+        ts_hit = datetime.now().isoformat()
         t2 = time.perf_counter()
         r2 = session.get(url)
         t3 = time.perf_counter()
+        duracion_hit_ms = (t3 - t2) * 1000
+
+        registros_csv.append({
+            "timestamp": ts_hit,
+            "iteracion": i,
+            "es_warmup": es_warmup,
+            "tipo_cache": "HIT",
+            "medicamento": args.medicamento,
+            "status_code": r2.status_code,
+            "tiempo_ms": round(duracion_hit_ms, 3),
+        })
+
         if r2.status_code != 200:
             print(f"  iter {i} (HIT): {r2.status_code} {r2.text[:120]}")
             continue
 
         if medido:
-            tiempos_miss.append((t1 - t0) * 1000)
-            tiempos_hit.append((t3 - t2) * 1000)
+            tiempos_miss.append(duracion_miss_ms)
+            tiempos_hit.append(duracion_hit_ms)
+
+    # Exportar datos a CSV
+    if args.output_csv:
+        guardar_registros_csv(args.output_csv, registros_csv)
 
     print(f"\nMedicamento: {args.medicamento}   (warmup descartado: {args.warmup} iteraciones)")
     fila_miss = resumen("Cache MISS (consulta va hasta gRPC/Stock)", tiempos_miss)
